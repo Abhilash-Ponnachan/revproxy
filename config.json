@@ -1,0 +1,9 @@
+{
+    "port": "9090",
+    "backendHost": "http://localhost",
+    "backendPort": "8080",
+    "authHost": "http://localhost",
+	"authPort": "8585"
+    
+
+}
