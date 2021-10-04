@@ -3,7 +3,9 @@
     "backendHost": "http://localhost",
     "backendPort": "8080",
     "authHost": "http://localhost",
-	"authPort": "8585"
+    "authPort": "8585",
+    "tokenPath": "api/token",
+    "cookieName": "authn"
     
 
 }

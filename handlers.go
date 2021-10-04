@@ -1,14 +1,18 @@
 package main
 
 import (
+	"bytes"
+	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
+	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"time"
 )
+
+const msgAuthFailed = "Authentication Failed"
 
 // handler funcs for diff req
 type reqHandler struct {
@@ -57,39 +61,118 @@ func (rh *reqHandler) datetime(w http.ResponseWriter, r *http.Request) {
 func (rh *reqHandler) basehandler(w http.ResponseWriter, r *http.Request) {
 	if isReqFromAuth(r) {
 		// req is a redirect back from auth provider
-		if hasValidAuthCode(r) {
+		if b1, ac := hasAuthCode(r); b1 {
 			// get token from AuthN provider /token
-			// set as session, http only cookie
+			b2, tk := getIdToken(ac)
+			if b2 {
+				//log.Printf("Token = %s\n", tk)
+				// set as session, http only cookie
+				ck := http.Cookie{
+					Name:     config().CookieName,
+					Value:    tk,
+					HttpOnly: false,
+				}
+				http.SetCookie(w, &ck)
+				// forward to backend/upstream -ideal
+				//rh.revproxy.ServeHTTP(w, r)
+				// double back to self clear browser url!!
+				// TO Do - Decide how to handle!!
+				http.Redirect(w, r,
+					"http://localhost:9090",
+					http.StatusFound)
+			} else {
+				// return 401
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte(msgAuthFailed))
+			}
+
 		} else {
-			// AuthN failed !!
 			// return 401
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(msgAuthFailed))
 		}
 
 	} else {
+		// request from client
 		if isAlreadyAuthN(r) {
 			//fwd/proxy to backend
+			rh.revproxy.ServeHTTP(w, r)
 		} else {
 			// redirect to AuthN provider
+			http.Redirect(w, r, config().authURL, http.StatusFound)
 		}
 	}
 	// debug
-	log.Printf("Req = %v\n", r.Header)
-	http.Redirect(w, r, config().authURL, http.StatusFound)
-	// forward to backend/upstream
-	//rh.revproxy.ServeHTTP(w, r)
+	//log.Printf("Req = %v\n", r.Header)
 }
 
-func hasValidAuthCode(r *http.Request) bool {
-	// check req origin in header
-	return false
+func getIdToken(code string) (bool, string) {
+	// POSt request to AuthN API
+	dt := struct {
+		Code string
+	}{
+		code,
+	}
+	bd, err := json.Marshal(&dt)
+	if err != nil {
+		return false, ""
+	}
+	rsp, err := http.Post(config().tokenURL, "application/json",
+		bytes.NewBuffer(bd))
+	if err != nil {
+		return false, ""
+	}
+	if rsp.StatusCode == http.StatusOK {
+		defer rsp.Body.Close()
+		// read response body
+		rb, err := ioutil.ReadAll(rsp.Body)
+		if err != nil {
+			return false, ""
+		}
+		sb := string(rb)
+		//log.Printf("Resp = %v\n", sb)
+		// Assume itis proper token
+		// Further validation ignored
+		return true, sb
+		/*
+			curl -X POST http://localhost:8585/api/token \
+			 -H 'Content-Type: application/json'  \
+			 -d '{"Code": "QWxhbgoyMDIxLTEwLTAzIDE5OjA1OjEwLjc4NDQ5MA=="}'
+
+			>> eyJTdWJqZWN0IjoiQWxhbiIsIlRpbWVTdGFtcCI6IjIwMjEtMTAtMDMgMTk6MDU6MzQuNjY2NDE2In0=
+		*/
+	}
+
+	return false, ""
+}
+
+func hasAuthCode(r *http.Request) (bool, string) {
+	// check auth code as query param
+	q := r.URL.Query()
+	ac, x := q["code"]
+	//log.Printf("URL Before ==> %v\n", r.URL)
+	if x && len(ac) == 1 {
+		// try decode auth code
+		_, err := b64.URLEncoding.DecodeString(ac[0])
+		// cleanup queryparam to remove authcode
+		// in further communication
+		q.Del("code")
+		r.URL.RawQuery = q.Encode()
+		//log.Printf("URL After ==> %v\n", r.URL)
+		return err == nil, ac[0]
+	}
+	// if reached here it failed
+	return false, ""
 }
 
 func isReqFromAuth(r *http.Request) bool {
 	// check req origin in header
-	return false
+	o := r.Header.Get("Origin")
+	return o != "" && o == config().authURL
 }
 
 func isAlreadyAuthN(r *http.Request) bool {
 	// check if request has idtoken in cookie
-	return false
+	_, err := r.Cookie(config().CookieName)
+	return err == nil
 }

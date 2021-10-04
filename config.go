@@ -17,8 +17,11 @@ type configData struct {
 	BackendPort string
 	AuthHost    string
 	AuthPort    string
+	TokenPath   string
 	backendURL  string
 	authURL     string
+	tokenURL    string
+	CookieName  string
 }
 
 var once sync.Once
@@ -32,6 +35,7 @@ func config() *configData {
 				cf.load()
 				cf.backendURL = formURL(cf.BackendHost, cf.BackendPort)
 				cf.authURL = formURL(cf.AuthHost, cf.AuthPort)
+				cf.tokenURL = fmt.Sprintf("%s/%s", cf.authURL, cf.TokenPath)
 			})
 	}
 	return cf
