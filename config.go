@@ -10,6 +10,10 @@ import (
 
 const configFile = "./config.json"
 const portEnvKey = "PORT"
+const bkendHOSTEnvKey = "BKHOST"
+const bkendPortEnvKey = "BKPORT"
+const authHOSTEnvKey = "AUTHHOST"
+const authPortEnvKey = "AUTHPORT"
 
 type configData struct {
 	Port        string
@@ -54,8 +58,16 @@ func (cf *configData) load() {
 	// assign to 'cf' fields
 	//log.Printf("cf = %v\n", cf)
 	checkerr(err)
-	port := os.Getenv(portEnvKey)
-	if port != "" {
-		cf.Port = port
+	setEnvValue(&cf.Port, portEnvKey)
+	setEnvValue(&cf.BackendHost, bkendHOSTEnvKey)
+	setEnvValue(&cf.BackendPort, bkendPortEnvKey)
+	setEnvValue(&cf.AuthHost, authHOSTEnvKey)
+	setEnvValue(&cf.AuthPort, authPortEnvKey)
+}
+
+func setEnvValue(field *string, key string) {
+	v := os.Getenv(key)
+	if v != "" {
+		*field = v
 	}
 }

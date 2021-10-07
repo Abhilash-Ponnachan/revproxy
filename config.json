@@ -6,6 +6,4 @@
     "authPort": "8585",
     "tokenPath": "api/token",
     "cookieName": "authn"
-    
-
 }

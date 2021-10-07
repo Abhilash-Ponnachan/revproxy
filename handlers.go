@@ -75,10 +75,13 @@ func (rh *reqHandler) basehandler(w http.ResponseWriter, r *http.Request) {
 				http.SetCookie(w, &ck)
 				// forward to backend/upstream -ideal
 				//rh.revproxy.ServeHTTP(w, r)
-				// double back to self clear browser url!!
-				// TO Do - Decide how to handle!!
+
+				// XOR ??
+
+				// roundtrip back to self clear browser url!!
+				self := fmt.Sprintf("http://%s", r.Host)
 				http.Redirect(w, r,
-					"http://localhost:9090",
+					self,
 					http.StatusFound)
 			} else {
 				// return 401
