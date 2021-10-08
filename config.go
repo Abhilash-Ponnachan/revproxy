@@ -14,6 +14,8 @@ const bkendHOSTEnvKey = "BKHOST"
 const bkendPortEnvKey = "BKPORT"
 const authHOSTEnvKey = "AUTHHOST"
 const authPortEnvKey = "AUTHPORT"
+const tokenHOSTEnvKey = "TOKENHOST"
+const tokenPortEnvKey = "TOKENPORT"
 
 type configData struct {
 	Port        string
@@ -21,6 +23,8 @@ type configData struct {
 	BackendPort string
 	AuthHost    string
 	AuthPort    string
+	TokenHost   string
+	TokenPort   string
 	TokenPath   string
 	backendURL  string
 	authURL     string
@@ -39,7 +43,9 @@ func config() *configData {
 				cf.load()
 				cf.backendURL = formURL(cf.BackendHost, cf.BackendPort)
 				cf.authURL = formURL(cf.AuthHost, cf.AuthPort)
-				cf.tokenURL = fmt.Sprintf("%s/%s", cf.authURL, cf.TokenPath)
+				cf.tokenURL = fmt.Sprintf("%s/%s",
+					formURL(cf.TokenHost, cf.TokenPort),
+					cf.TokenPath)
 			})
 	}
 	return cf
@@ -63,6 +69,8 @@ func (cf *configData) load() {
 	setEnvValue(&cf.BackendPort, bkendPortEnvKey)
 	setEnvValue(&cf.AuthHost, authHOSTEnvKey)
 	setEnvValue(&cf.AuthPort, authPortEnvKey)
+	setEnvValue(&cf.TokenHost, tokenHOSTEnvKey)
+	setEnvValue(&cf.TokenPort, tokenPortEnvKey)
 }
 
 func setEnvValue(field *string, key string) {
