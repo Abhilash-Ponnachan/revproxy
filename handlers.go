@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -61,6 +62,7 @@ func (rh *reqHandler) datetime(w http.ResponseWriter, r *http.Request) {
 func (rh *reqHandler) basehandler(w http.ResponseWriter, r *http.Request) {
 	if isReqFromAuth(r) {
 		// req is a redirect back from auth provider
+		log.Println("Redirect back After Auth")
 		if b1, ac := hasAuthCode(r); b1 {
 			// get token from AuthN provider /token
 			b2, tk := getIdToken(ac)
@@ -102,7 +104,9 @@ func (rh *reqHandler) basehandler(w http.ResponseWriter, r *http.Request) {
 			rh.revproxy.ServeHTTP(w, r)
 		} else {
 			// redirect to AuthN provider
-			http.Redirect(w, r, config().authURL, http.StatusFound)
+			// send 'self' as return
+			rdURL := fmt.Sprintf("%s?return=%s", config().authURL, r.Host)
+			http.Redirect(w, r, rdURL, http.StatusFound)
 		}
 	}
 	// debug
@@ -153,7 +157,7 @@ func hasAuthCode(r *http.Request) (bool, string) {
 	// check auth code as query param
 	q := r.URL.Query()
 	ac, x := q["code"]
-	//log.Printf("URL Before ==> %v\n", r.URL)
+	//log.Printf("access code ==> %v\n", ac)
 	if x && len(ac) == 1 {
 		// try decode auth code
 		_, err := b64.URLEncoding.DecodeString(ac[0])
@@ -171,7 +175,19 @@ func hasAuthCode(r *http.Request) (bool, string) {
 func isReqFromAuth(r *http.Request) bool {
 	// check req origin in header
 	o := r.Header.Get("Origin")
-	return o != "" && o == config().authURL
+	log.Printf("Origin = %s ; AuthUrl = %s\n", o, config().authURL)
+	if o != "" {
+		if config().AuthPort == "80" || config().AuthPort == "443" {
+			// for default ports 'Origin' header will not have port
+			// Origin = http://authsimple.com
+			// AuthUrl = http://authsimple.com:80
+			return o == config().AuthHost
+		}
+		// else check host & port
+		return o == config().authURL
+	}
+	// if reached here re is not from auth provider
+	return false
 }
 
 func isAlreadyAuthN(r *http.Request) bool {
